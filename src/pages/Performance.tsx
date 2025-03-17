@@ -1,9 +1,8 @@
 import React from 'react';
 import { Container, Table, Card, Row, Col } from 'react-bootstrap';
-import { studentData, StudentPerformance } from '../data/studentData';
+import { studentData } from '../data/studentData';
 
 const Performance: React.FC = () => {
-  // Sort students by GPA for consistent display
   const sortedStudents = [...studentData].sort((a, b) => b.gpa - a.gpa);
   const topPerformer = sortedStudents[0];
   const highestExamScore = [...studentData].sort((a, b) => b.examScore - a.examScore)[0];
