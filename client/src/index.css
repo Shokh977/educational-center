@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+  body {
+    @apply m-0 font-sans;
+  }
+  
+  /* Added softer text colors for light mode */
+  .light-mode-text {
+    @apply text-gray-700;
+  }
+  .light-mode-heading {
+    @apply text-gray-800;
+  }
+  .light-mode-subtle {
+    @apply text-gray-500;
+  }
+}
+
+.dark {
+  @apply bg-darkBg text-darkText;
+}
+
+* {
+  @apply transition-colors duration-300;
+}
+
+/* Add utility classes for improved light mode appearance */
+.light-input {
+  @apply bg-white border border-gray-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-gray-700;
+}
+
+.light-card {
+  @apply bg-white shadow-sm border border-gray-100 text-gray-700;
+}

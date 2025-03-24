@@ -1,22 +1,13 @@
 {
-  "name": "educational-website",
-  "version": "0.1.0",
+  "name": "client",
+  "version": "1.0.0",
   "private": true,
+  "main": "index.js",
   "dependencies": {
-    "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "axios": "^1.8.4",
-    "bcryptjs": "^3.0.2",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "html-webpack-plugin": "^5.6.3",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.12.1",
-    "multer": "^1.4.5-lts.2",
+    "@types/react": "^18.3.18",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-icons": "^4.11.0",
@@ -25,10 +16,8 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "set SET NODE_OPTIONS=--openssl-legacy-provider && react-scripts start",
-    "server": "nodemon server.js",
-    "client": "react-scripts start",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "start": "cross-env NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
+    "dev": "cross-env NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -54,9 +43,12 @@
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.10",
     "autoprefixer": "^10.4.17",
-    "concurrently": "^9.1.2",
-    "nodemon": "^3.1.9",
+    "cross-env": "^7.0.3",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1"
-  }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
 }

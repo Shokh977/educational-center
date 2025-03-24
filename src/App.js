@@ -21,7 +21,7 @@ function HomeContent() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-4xl font-extrabold text-gray-900 dark:text-gray-100 sm:text-5xl">
-              Transform Your Future with Quality 
+              Transform Your Future with Quality
             </h2>
             <p className="mt-4 text-xl text-gray-600 dark:text-gray-400">
               Join our learning community and unlock your potential
@@ -182,7 +182,7 @@ function App() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex justify-between h-16 items-center">
                 <div className="flex-shrink-0">
-                  <Link to="/" className="text-2xl font-bold text-primary dark:text-secondary">EduCenter</Link>
+                  <Link to="/" className="text-2xl font-bold text-primary dark:text-secondary">EduCenter Test</Link>
                 </div>
 
                 {/* Desktop Navigation */}
@@ -252,7 +252,7 @@ function App() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
                 <div>
-                  <h3 className="text-xl font-bold mb-4">EduCenter</h3>
+                  <h3 className="text-xl font-bold font mb-4">EduCenter</h3>
                   <p className="text-gray-400">Transforming lives through education</p>
                 </div>
                 <div>
