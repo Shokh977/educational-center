@@ -19,8 +19,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import AdminDashboard from './components/AdminDashboard';
-import CreateCourse from './components/CreateCourse';
+import ImprovedCreateCourse from './components/ImprovedCreateCourse';
 import CourseContentManager from './components/admin/CourseContentManager';
+import VideoUploader from './components/VideoUploader';
 
 const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
@@ -98,12 +99,11 @@ const App: React.FC = () => {
                   } 
                 />
                 <Route path="/contact" element={<Contact />} />                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route 
+                <Route path="/register" element={<Register />} />                <Route 
                   path="/admin/courses/create" 
                   element={
                     <ProtectedRoute allowedRoles={['admin']}>
-                      <CreateCourse />
+                      <ImprovedCreateCourse />
                     </ProtectedRoute>
                   } 
                 />
@@ -111,7 +111,7 @@ const App: React.FC = () => {
                   path="/admin/courses/edit/:courseId" 
                   element={
                     <ProtectedRoute allowedRoles={['admin']}>
-                      <CreateCourse />
+                      <ImprovedCreateCourse />
                     </ProtectedRoute>
                   } 
                 />
@@ -120,6 +120,14 @@ const App: React.FC = () => {
                   element={
                     <ProtectedRoute allowedRoles={['admin']}>
                       <CourseContentManager />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/admin/video-upload" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                      <VideoUploader />
                     </ProtectedRoute>
                   } 
                 />

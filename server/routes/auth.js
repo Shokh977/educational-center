@@ -14,9 +14,7 @@ router.post('/register', async (req, res) => {
         // Ensure content type is set
         res.setHeader('Content-Type', 'application/json');
         
-        const { name, email, password, role } = req.body;
-
-        // Validate required fields
+        const { name, email, password, role } = req.body;        // Validate required fields
         if (!name || !email || !password) {
             console.log('Missing required fields:', { name: !!name, email: !!email, password: !!password });
             return res.status(400).json({
@@ -32,14 +30,11 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'Email is already registered' });
         }
 
-        // Create new user with hashed password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-        
+        // Create new user - password will be hashed in the pre-save hook
         const user = new User({
             name,
             email,
-            password: hashedPassword,
+            password, // This will be hashed by the pre-save hook in the User model
             role: role || 'student' // Default to student if role not provided
         });
         
@@ -108,6 +103,14 @@ router.post('/login', async (req, res) => {
             console.log('User not found:', email);
             return res.status(401).json({ message: 'Invalid email or password' });
         }
+
+        // Check if user has a valid role
+        if (!['student', 'teacher', 'admin'].includes(user.role)) {
+            console.log('User has invalid role:', user.role);
+            return res.status(401).json({ message: 'Account has invalid role. Please contact support.' });
+        }
+        
+        console.log(`Comparing password for ${email} with role ${user.role}`);
         
         // Check password match
         const isMatch = await bcrypt.compare(password, user.password);
@@ -116,6 +119,8 @@ router.post('/login', async (req, res) => {
             console.log('Password mismatch for:', email);
             return res.status(401).json({ message: 'Invalid email or password' });
         }
+        
+        console.log('Password match successful for:', email);
         
         // Update last login time
         user.lastLogin = Date.now();

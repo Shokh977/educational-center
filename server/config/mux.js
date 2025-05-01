@@ -1,20 +1,9 @@
 // Mux configuration
-const Mux = require('@mux/mux-node');
-require('dotenv').config();
+const dotenv = require('dotenv');
+dotenv.config();
 
-// Initialize Mux client with API credentials
-const { Video } = new Mux(
-  process.env.MUX_TOKEN_ID,
-  process.env.MUX_TOKEN_SECRET
-);
-
-// Default signing key for secure tokens
-const DEFAULT_SIGNING_KEY = {
-  id: process.env.MUX_SIGNING_KEY_ID,
-  privateKey: process.env.MUX_SIGNING_PRIVATE_KEY
-};
-
-// Default Mux video settings
+let Video = null;
+let DEFAULT_SIGNING_KEY = null;
 const DEFAULT_PLAYBACK_POLICY = ['signed'];
 const DEFAULT_NEW_ASSET_SETTINGS = {
   playback_policy: DEFAULT_PLAYBACK_POLICY,
@@ -23,33 +12,39 @@ const DEFAULT_NEW_ASSET_SETTINGS = {
   passthrough: '',
 };
 
+// Try to initialize Mux if environment variables are available
+try {
+  if (process.env.MUX_TOKEN_ID && process.env.MUX_TOKEN_SECRET) {
+    const Mux = require('@mux/mux-node');
+    const { Video: MuxVideo } = new Mux(
+      process.env.MUX_TOKEN_ID,
+      process.env.MUX_TOKEN_SECRET
+    );
+    
+    Video = MuxVideo;
+    
+    // Default signing key for secure tokens
+    DEFAULT_SIGNING_KEY = {
+      id: process.env.MUX_SIGNING_KEY_ID,
+      privateKey: process.env.MUX_SIGNING_PRIVATE_KEY
+    };
+    
+    console.log('Mux video service initialized successfully');
+  } else {
+    console.log('Mux configuration not available - using Cloudinary for video processing');
+  }
+} catch (error) {
+  console.error('Failed to initialize Mux video service:', error.message);
+  console.log('Continuing with Cloudinary for video processing');
+}
+
 module.exports = {
   Video,
   DEFAULT_SIGNING_KEY,
   DEFAULT_PLAYBACK_POLICY,
   DEFAULT_NEW_ASSET_SETTINGS,
   // Function to create JWT tokens for secure playback
-  createPlaybackToken: (playbackId, options = {}) => {
-    if (!DEFAULT_SIGNING_KEY.id || !DEFAULT_SIGNING_KEY.privateKey) {
-      throw new Error('Mux signing key not properly configured');
-    }
-
-    const tokenOptions = {
-      keyId: DEFAULT_SIGNING_KEY.id,
-      keySecret: DEFAULT_SIGNING_KEY.privateKey,
-      ...options
-    };
-
-    // Create playback token with the following parameters
-    const token = Video.JWT.signPlaybackId(playbackId, {
-      ...tokenOptions,
-      // Token expiration time (default: 1 hour)
-      expiration: options.expiration || Math.floor(Date.now() / 1000) + 60 * 60,
-      type: 'video',
-      // Additional claims/parameters as needed
-      params: options.params || {}
-    });
-
-    return token;
-  }
+  
+  // Helper function to check if Mux is available
+  isMuxAvailable: () => !!Video
 };

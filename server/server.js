@@ -115,7 +115,13 @@ const startServer = async () => {
     
     // Add profile routes for consistent user data updates
     const profileRoutes = require('./routes/profile');
-    app.use('/api/profile', profileRoutes);    // Add secure videos routes for Mux integration
+    app.use('/api/profile', profileRoutes);
+    
+    // Add video upload routes for Cloudinary integration
+    const videoRoutes = require('./routes/videos');
+    app.use('/api/videos', videoRoutes);
+    
+    // Add secure videos routes for Mux integration
     const secureVideosRoutes = require('./routes/secureVideos');
     app.use('/api/secure-videos', secureVideosRoutes);
     

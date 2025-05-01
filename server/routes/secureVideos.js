@@ -8,6 +8,25 @@ const mongoose = require('mongoose');
 const Chapter = mongoose.model('Chapter');
 
 /**
+ * @route   GET api/secure-videos/status
+ * @desc    Check if Mux service is available
+ * @access  Public
+ */
+router.get('/status', async (req, res) => {
+  try {
+    const isAvailable = muxService.isMuxAvailable();
+    
+    res.json({
+      muxAvailable: isAvailable,
+      videoService: isAvailable ? 'mux' : 'cloudinary'
+    });
+  } catch (error) {
+    console.error('Error checking Mux status:', error.message);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
+/**
  * @route   POST api/secure-videos/upload-url
  * @desc    Get a direct upload URL for Mux
  * @access  Teacher/Admin only
@@ -25,6 +44,15 @@ router.post('/upload-url', [
   }
 
   try {
+    // Check if Mux is available
+    if (!muxService.isMuxAvailable()) {
+      return res.status(400).json({ 
+        msg: 'Mux service is not available. Please use Cloudinary for video uploads.',
+        alternativeService: 'cloudinary',
+        endpoint: '/api/videos/upload'
+      });
+    }
+    
     // Only teachers/admins can upload videos
     if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
       return res.status(403).json({ msg: 'Not authorized to upload videos' });

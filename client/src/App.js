@@ -1,5 +1,6 @@
 import TeachersPage from './pages/TeachersPage';
 import CourseContentManager from './components/admin/CourseContentManager';
+import CourseCMS from './components/admin/CourseCMS';
 
 // Inside your Routes component
 <div>
@@ -17,6 +18,14 @@ import CourseContentManager from './components/admin/CourseContentManager';
     element={
       <ProtectedRoute>
         <CourseContentManager />
+      </ProtectedRoute>
+    } 
+  />
+  <Route 
+    path="/admin/course/new" 
+    element={
+      <ProtectedRoute>
+        <CourseCMS />
       </ProtectedRoute>
     } 
   />

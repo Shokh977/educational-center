@@ -16,23 +16,30 @@ const contentSchema = new mongoose.Schema({
     trim: true
   },
   file: {
-    type: String, // URL to the file (PDF) or legacy storage path
+    type: String, // URL to the file (video URL from Cloudinary, PDF, etc.)
     required: function() {
-      // Only require file field for PDF type
-      return this.type === 'pdf';
+      // Require file field for PDF and video types when ready
+      return this.type === 'pdf' || (this.type === 'video' && this.status === 'ready');
+    }
+  },
+  // Cloudinary specific fields
+  publicId: {
+    type: String, // Cloudinary public ID for the video
+    required: function() {
+      return this.type === 'video' && this.status === 'ready' && !this.muxAssetId;
     }
   },
   // Mux Video specific fields
   muxAssetId: {
     type: String,
     required: function() {
-      return this.type === 'video' && this.status === 'ready';
+      return this.type === 'video' && this.status === 'ready' && !this.publicId;
     }
   },
   muxPlaybackId: {
     type: String,
     required: function() {
-      return this.type === 'video' && this.status === 'ready';
+      return this.type === 'video' && this.status === 'ready' && !this.publicId;
     }
   },
   status: {

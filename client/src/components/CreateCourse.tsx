@@ -22,6 +22,8 @@ import {
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import ChapterCreator from './ChapterCreator';
+import ChapterContent from './ChapterContent';
 
 // Add type definitions for drag-and-drop context
 interface DropResultType {
@@ -73,6 +75,11 @@ interface ContentItem {
   file?: File | null;
   duration?: string;
   questions?: QuizQuestion[];
+  description?: string;
+  url?: string;    // For storing the uploaded video/pdf URL from Cloudinary
+  publicId?: string; // For storing the Cloudinary public ID for videos
+  status?: 'draft' | 'uploading' | 'ready' | 'error';
+  uploadProgress?: number;
 }
 
 interface QuizQuestion {
@@ -247,6 +254,70 @@ const CreateCourse: React.FC<CreateCourseProps> = ({ onCourseCreated }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [currentContentType, setCurrentContentType] = useState<'video' | 'pdf' | 'quiz'>('video');
+  
+  // Function to handle video upload completion
+  const handleVideoUploaded = (chapterIndex: number, videoData: VideoData) => {
+    const updatedChapters = [...chapters];
+    updatedChapters[chapterIndex].contents.push({
+      type: 'video',
+      title: videoData.title,
+      description: videoData.description,
+      url: videoData.url,
+      publicId: videoData.publicId,
+      duration: videoData.duration?.toString(),
+      status: 'ready'
+    });
+    
+    setChapters(updatedChapters);
+    setSuccessMessage('Video uploaded successfully!');
+    setSuccess(true);
+    
+    setTimeout(() => {
+      setSuccess(false);
+    }, 3000);
+  };
+  
+  // Function to handle PDF upload completion
+  const handlePdfUploaded = (chapterIndex: number, pdfData: PDFData) => {
+    const updatedChapters = [...chapters];
+    updatedChapters[chapterIndex].contents.push({
+      type: 'pdf',
+      title: pdfData.title,
+      description: pdfData.description,
+      url: pdfData.url,
+      publicId: pdfData.publicId,
+      status: 'ready'
+    });
+    
+    setChapters(updatedChapters);
+    setSuccessMessage('PDF document uploaded successfully!');
+    setSuccess(true);
+    
+    setTimeout(() => {
+      setSuccess(false);
+    }, 3000);
+  };
+  
+  // Function to handle quiz creation completion
+  const handleQuizCreated = (chapterIndex: number, quizData: { title: string; description: string; questions: any[] }) => {
+    const updatedChapters = [...chapters];
+    updatedChapters[chapterIndex].contents.push({
+      type: 'quiz',
+      title: quizData.title,
+      description: quizData.description,
+      questions: quizData.questions,
+      status: 'ready'
+    });
+    
+    setChapters(updatedChapters);
+    setSuccessMessage('Quiz created successfully!');
+    setSuccess(true);
+    
+    setTimeout(() => {
+      setSuccess(false);
+    }, 3000);
+  };
 
   const quillModules = {
     toolbar: [
@@ -1199,34 +1270,74 @@ const CreateCourse: React.FC<CreateCourseProps> = ({ onCourseCreated }) => {
                               ) : (
                                 <p className="text-gray-500 dark:text-gray-400 italic mb-4">No content added yet</p>
                               )}
-                              
-                              {activeChapterIndex === index && (
+                                {activeChapterIndex === index && (
                                 <div className="border dark:border-gray-700 rounded-lg p-4 mb-4">
                                   <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-3">Add Content</h4>
                                   
-                                  <div className="space-y-4">
-                                    <div>
-                                      <label htmlFor="content-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Content Type
-                                      </label>
-                                      <select
-                                        id="content-type"
-                                        name="type"
-                                        value={newContent.type}
-                                        onChange={handleContentChange}
-                                        className="w-full rounded-md border dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white px-3 py-2 focus:outline-none focus:ring-primary dark:focus:ring-secondary focus:border-primary dark:focus:border-secondary"
+                                  <div className="mb-4">
+                                    <div className="flex space-x-2 mb-4">
+                                      <button
+                                        type="button"
+                                        onClick={() => setCurrentContentType('video')}
+                                        className={`flex items-center px-3 py-2 rounded ${
+                                          currentContentType === 'video'
+                                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                        }`}
                                       >
-                                        <option value="video">Video</option>
-                                        <option value="pdf">PDF Document</option>
-                                        <option value="quiz">Quiz</option>
-                                      </select>
+                                        <HiOutlineVideoCamera className="w-5 h-5 mr-2" />
+                                        Video
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setCurrentContentType('pdf')}
+                                        className={`flex items-center px-3 py-2 rounded ${
+                                          currentContentType === 'pdf'
+                                            ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200'
+                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                        }`}
+                                      >
+                                        <HiOutlineDocumentText className="w-5 h-5 mr-2" />
+                                        PDF
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setCurrentContentType('quiz')}
+                                        className={`flex items-center px-3 py-2 rounded ${
+                                          currentContentType === 'quiz'
+                                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200'
+                                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                        }`}
+                                      >
+                                        <HiOutlineQuestionMarkCircle className="w-5 h-5 mr-2" />
+                                        Quiz
+                                      </button>
                                     </div>
                                     
-                                    <div>
-                                      <label htmlFor="content-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Title
-                                      </label>
-                                      <input
+                                    {currentContentType === 'video' && (
+                                      <ChapterVideoUploader
+                                        chapterId={chapter.id}
+                                        courseId={currentCourseId}
+                                        onVideoUploaded={(videoData) => handleVideoUploaded(index, videoData)}
+                                      />
+                                    )}
+                                    
+                                    {currentContentType === 'pdf' && (
+                                      <ChapterPDFUploader
+                                        chapterId={chapter.id}
+                                        courseId={currentCourseId}
+                                        onPdfUploaded={(pdfData) => handlePdfUploaded(index, pdfData)}
+                                      />
+                                    )}
+                                    
+                                    {currentContentType === 'quiz' && (
+                                      <ChapterQuizCreator
+                                        onQuizCreated={(quizData) => handleQuizCreated(index, quizData)}
+                                      />
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                                         type="text"
                                         id="content-title"
                                         name="title"

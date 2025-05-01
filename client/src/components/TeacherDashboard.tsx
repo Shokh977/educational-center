@@ -74,12 +74,20 @@ const TeacherDashboard = () => {
             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
               Your Courses
             </h2>
-            <Link
-              to="/create-course"
-              className="bg-primary dark:bg-secondary text-white px-4 py-2 rounded-md hover:bg-primary/90 dark:hover:bg-secondary/90"
-            >
-              Create New Course
-            </Link>
+            <div className="flex space-x-2">
+              <Link
+                to="/admin/video-upload"
+                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+              >
+                Upload Video
+              </Link>
+              <Link
+                to="/create-course"
+                className="bg-primary dark:bg-secondary text-white px-4 py-2 rounded-md hover:bg-primary/90 dark:hover:bg-secondary/90"
+              >
+                Create New Course
+              </Link>
+            </div>
           </div>
           <div className="grid gap-6">
             {teachingCourses.map(course => (

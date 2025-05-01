@@ -1,90 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const Course = require('../models/Course');
-const Chapter = require('../models/Chapter');
+const courseController = require('../controllers/courseController');
 const auth = require('../middleware/auth');
+const admin = require('../middleware/admin');
+const { courseUpload, contentUpload } = require('../config/multerConfig');
 
-// Get a single course with chapters
-router.get('/:id', async (req, res) => {
-  try {
-    const course = await Course.findById(req.params.id)
-      .populate('instructor', 'name email')
-      .populate({
-        path: 'chapters',
-        options: { sort: { order: 1 } }
-      });
-    
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-    
-    res.json(course);
-  } catch (error) {
-    console.error('Error fetching course:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
+// Public routes
+router.get('/', courseController.getCourses);
+router.get('/:courseId', courseController.getCourseById);
+router.get('/:courseId/preview', courseController.getCoursePreview);
 
-// Enroll in a course
-router.post('/:id/enroll', auth, async (req, res) => {
-  try {
-    const course = await Course.findById(req.params.id);
-    
-    if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
-    }
-    
-    // Check if user is already enrolled
-    if (course.enrolledStudents.includes(req.user.id)) {
-      return res.status(400).json({ message: 'Already enrolled in this course' });
-    }
-    
-    // Add user to enrolled students
-    course.enrolledStudents.push(req.user.id);
-    await course.save();
-    
-    res.json({ message: 'Successfully enrolled in course', course });
-  } catch (error) {
-    console.error('Error enrolling in course:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
+// Authenticated routes
+router.use(auth);
 
-// Get all courses (with filters)
-router.get('/', async (req, res) => {
-  try {
-    const { category, level, search } = req.query;
-    
-    // Build filter object based on query parameters
-    const filter = {};
-    
-    // Apply category filter
-    if (category && category !== "All") {
-      filter.category = category;
-    }
-    
-    // Apply level filter
-    if (level && level !== "All") {
-      filter.level = level;
-    }
-    
-    // Apply search filter
-    if (search) {
-      filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    const courses = await Course.find(filter)
-      .populate('instructor', 'name')
-      .sort({ createdAt: -1 });
-    
-    res.json(courses);
-  } catch (error) {
-    console.error('Error fetching courses:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
+// Enrollment routes
+router.post('/:courseId/enroll', courseController.enrollInCourse);
+router.get('/:courseId/progress', courseController.getUserCourseProgress);
+router.post('/:courseId/chapters/:chapterId/contents/:contentId/complete', courseController.markContentCompleted);
+
+// Instructor routes - require authentication
+router.post('/', courseUpload.single('thumbnail'), courseController.createCourse);
+router.post('/:courseId/chapters', courseController.addChapter);
+router.post('/:courseId/chapters/:chapterId/contents', contentUpload.fields([
+  { name: 'video', maxCount: 1 },
+  { name: 'file', maxCount: 1 }
+]), courseController.addContent);
+router.put('/:courseId', courseUpload.single('thumbnail'), courseController.updateCourse);
+router.patch('/:courseId/status', courseController.togglePublishStatus);
+router.put('/:courseId/chapters/order', courseController.updateChapterOrder);
+router.get('/:courseId/students', courseController.getEnrolledStudents);
+router.delete('/:courseId', courseController.deleteCourse);
 
 module.exports = router;

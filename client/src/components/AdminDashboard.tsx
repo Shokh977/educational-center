@@ -355,6 +355,12 @@ const AdminDashboard: React.FC = () => {
             >
               Course Management
             </button>
+            <a
+              href="/admin/video-upload"
+              className="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300"
+            >
+              Video Upload
+            </a>
             <button
               onClick={() => setActiveTab('blog')}
               className={`${
@@ -451,7 +457,7 @@ const AdminDashboard: React.FC = () => {
                   Courses
                 </h2>
                 <a 
-                  href="/admin/courses/create" 
+                  href="/admin/course/new" 
                   className="bg-primary dark:bg-secondary text-white px-4 py-2 rounded-md hover:bg-primary/90 dark:hover:bg-secondary/90 flex items-center"
                 >
                   <HiPlus className="w-5 h-5 mr-2" />

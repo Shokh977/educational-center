@@ -90,7 +90,9 @@ userSchema.pre('save', async function(next) {
     try {
         if (this.isModified('password')) {
             console.log('Hashing password for user:', this.email);
-            this.password = await bcrypt.hash(this.password, 8);
+            // Always use the same salt rounds for consistency (10 is recommended)
+            const salt = await bcrypt.genSalt(10);
+            this.password = await bcrypt.hash(this.password, salt);
         }
         next();
     } catch (error) {

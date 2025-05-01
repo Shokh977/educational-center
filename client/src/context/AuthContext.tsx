@@ -20,14 +20,13 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {    const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
 
-    // Fix API_BASE_URL - remove redundant /api if it's already in the environment variable
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-    // Remove trailing /api if it exists to prevent duplication
+    // Fix API_BASE_URL to ensure proper URL construction
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    // Ensure we have the correct API URL structure
     const API_BASE_URL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
 
     useEffect(() => {

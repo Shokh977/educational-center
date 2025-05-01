@@ -1,15 +1,27 @@
-const { Video, DEFAULT_NEW_ASSET_SETTINGS, createPlaybackToken } = require('../config/mux');
+const { Video, DEFAULT_NEW_ASSET_SETTINGS, isMuxAvailable } = require('../config/mux');
 const mongoose = require('mongoose');
 const Course = mongoose.model('Course');
 const Chapter = mongoose.model('Chapter');
 
 class MuxService {
   /**
+   * Check if Mux services are available
+   * @returns {boolean} - Whether Mux is properly configured and available
+   */
+  isMuxAvailable() {
+    return isMuxAvailable();
+  }
+
+  /**
    * Create a new direct upload URL for securely uploading videos to Mux
    * @param {string} contentId - The content ID this upload is associated with
    * @returns {Promise<Object>} - The direct upload URL and other details
    */
   async createDirectUpload(contentId) {
+    if (!this.isMuxAvailable()) {
+      throw new Error('Mux service is not available. Please use Cloudinary for video uploads.');
+    }
+    
     try {
       // Create a direct upload URL that clients can use to upload videos
       const upload = await Video.Uploads.create({
