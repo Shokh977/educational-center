@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import axios from 'axios';
 import { 
   HiStar, 
   HiChevronDown, 
@@ -9,9 +10,13 @@ import {
   HiLockClosed,
   HiDownload,
   HiDocumentText,
-  HiAcademicCap
+  HiAcademicCap,
+  HiTranslate,
+  HiRefresh,
+  HiVolumeUp,
+  HiOutlineVolumeUp
 } from 'react-icons/hi';
-import { courseData } from './FeaturedCourses';
+import { useAuth } from '../context/AuthContext';
 
 // Enhanced mock course content data
 const mockCourseContent = {
@@ -144,6 +149,294 @@ const mockCourseContent = {
     ]
   }
 };
+
+// New component for vocabulary cards
+function VocabularyCards({ category, isEnrolled }) {
+  const [vocabularyWords, setVocabularyWords] = useState([]);
+  const [flippedCards, setFlippedCards] = useState({});
+  const [isPlaying, setIsPlaying] = useState({});
+  const audioRefs = useRef({});
+  
+  // Languages and their vocabulary words
+  const vocabularyByLanguage = {
+    "English Language": [
+      { word: "Eloquent", definition: "Fluent or persuasive in speaking or writing" },
+      { word: "Ambiguous", definition: "Open to more than one interpretation" },
+      { word: "Meticulous", definition: "Showing great attention to detail" },
+      { word: "Ubiquitous", definition: "Present, appearing, or found everywhere" },
+      { word: "Ephemeral", definition: "Lasting for a very short time" },
+      { word: "Pragmatic", definition: "Dealing with things sensibly and realistically" },
+      { word: "Resilient", definition: "Able to withstand or recover quickly from difficulties" },
+      { word: "Diligent", definition: "Having or showing care and conscientiousness" },
+      { word: "Verbose", definition: "Using or containing more words than necessary" },
+      { word: "Intricate", definition: "Very complicated or detailed" }
+    ],
+    "Spanish Language": [
+      { word: "Amanecer", definition: "Dawn or sunrise" },
+      { word: "Desarrollar", definition: "To develop or unfold" },
+      { word: "Enhorabuena", definition: "Congratulations" },
+      { word: "Aprovechar", definition: "To take advantage of" },
+      { word: "Deslumbrante", definition: "Dazzling or brilliant" },
+      { word: "Vergüenza", definition: "Shame or embarrassment" },
+      { word: "Escalofrío", definition: "Shiver or chill" },
+      { word: "Cosquillas", definition: "Tickle or tickling" },
+      { word: "Imprescindible", definition: "Essential or indispensable" },
+      { word: "Madrugar", definition: "To wake up early" }
+    ],
+    "Japanese Language": [
+      { word: "木漏れ日 (Komorebi)", definition: "Sunlight filtering through trees" },
+      { word: "侘寂 (Wabi-sabi)", definition: "Finding beauty in imperfection" },
+      { word: "頑張る (Ganbaru)", definition: "To persevere or do one's best" },
+      { word: "もったいない (Mottainai)", definition: "Too good to waste" },
+      { word: "わびさび (Wabisabi)", definition: "Rustic elegance, quiet taste" },
+      { word: "敷居が高い (Shikii ga takai)", definition: "A high threshold (difficult to approach)" },
+      { word: "空気を読む (Kuuki wo yomu)", definition: "To read the atmosphere" },
+      { word: "おかえり (Okaeri)", definition: "Welcome home" },
+      { word: "懐かしい (Natsukashii)", definition: "Nostalgic, fondly remembered" },
+      { word: "遠慮 (Enryo)", definition: "Restraint or holding back" }
+    ],
+    "Korean Language": [
+      { word: "정 (Jeong)", definition: "Affection, attachment, or fondness" },
+      { word: "눈치 (Nunchi)", definition: "The ability to gauge others' moods" },
+      { word: "아리랑 (Arirang)", definition: "Traditional Korean folk song" },
+      { word: "화이팅 (Hwaiting)", definition: "Good luck or cheer up" },
+      { word: "삼세번 (Samse-bun)", definition: "Third time's the charm" },
+      { word: "애교 (Aegyo)", definition: "Cutesy behaviors or actions" },
+      { word: "시원하다 (Shiwonhada)", definition: "Refreshing or relieving" },
+      { word: "한 (Han)", definition: "A feeling of unresolvable sadness or resentment" },
+      { word: "인연 (Inyeon)", definition: "Fateful relationship or connection" },
+      { word: "신기하다 (Shinkihada)", definition: "Amazing or fascinating" }
+    ],
+    "Business English": [
+      { word: "Leverage", definition: "Use something to maximum advantage" },
+      { word: "Streamline", definition: "Make more efficient or effective" },
+      { word: "Stakeholder", definition: "Person with interest or concern in something" },
+      { word: "Deliverable", definition: "Tangible or intangible object delivered" },
+      { word: "Synergy", definition: "Interaction of elements that produces greater effect" },
+      { word: "Paradigm", definition: "Pattern or model" },
+      { word: "Benchmark", definition: "Standard by which something can be measured" },
+      { word: "Incentivize", definition: "Motivate or encourage someone to do something" },
+      { word: "Scalable", definition: "Able to be changed in size or scale" },
+      { word: "Agile", definition: "Able to move quickly and easily" }
+    ]
+  };
+  
+  // Default words for any category not specifically defined
+  const defaultWords = [
+    { word: "Vocabulary", definition: "The body of words used in a particular language" },
+    { word: "Linguistic", definition: "Relating to language or linguistics" },
+    { word: "Expression", definition: "A word or phrase used to convey an idea" },
+    { word: "Fluency", definition: "The ability to speak or write a language easily and accurately" },
+    { word: "Comprehension", definition: "The ability to understand something" }
+  ];
+
+  // Language code mapping for speech synthesis
+  const languageCodeMap = {
+    "English Language": "en-US",
+    "Spanish Language": "es-ES",
+    "Japanese Language": "ja-JP",
+    "Korean Language": "ko-KR",
+    "Business English": "en-US"
+  };
+
+  useEffect(() => {
+    // Generate 5 random words based on course category
+    const generateVocabularyWords = () => {
+      const wordsForCategory = vocabularyByLanguage[category] || defaultWords;
+      
+      // Shuffle array and take first 5 items
+      const shuffled = [...wordsForCategory].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, 5);
+    };
+    
+    setVocabularyWords(generateVocabularyWords());
+  }, [category]);
+  
+  // Set up audio elements for each word
+  useEffect(() => {
+    audioRefs.current = {};
+    setIsPlaying({});
+  }, [vocabularyWords]);
+  
+  const refreshWords = () => {
+    const wordsForCategory = vocabularyByLanguage[category] || defaultWords;
+    const shuffled = [...wordsForCategory].sort(() => 0.5 - Math.random());
+    setVocabularyWords(shuffled.slice(0, 5));
+    setFlippedCards({});
+    setIsPlaying({});
+  };
+  
+  const toggleFlip = (index) => {
+    setFlippedCards(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const playAudio = (word, index, e) => {
+    e.stopPropagation();
+    
+    // Extract just the word without any parentheses or other characters
+    const cleanWord = word.replace(/\s*\(.*?\)\s*/g, '').trim();
+    
+    // Set playing state
+    setIsPlaying(prev => ({ ...prev, [index]: true }));
+    
+    // Use existing audio reference if available
+    if (audioRefs.current[index] && !audioRefs.current[index].error) {
+      audioRefs.current[index].play()
+        .catch(() => {
+          speakWordWithSynthesis(cleanWord, index);
+        });
+    } else {
+      speakWordWithSynthesis(cleanWord, index);
+    }
+  };
+  
+  const speakWordWithSynthesis = (word, index) => {
+    if (!window.speechSynthesis) {
+      console.error("Speech synthesis not supported in this browser");
+      setIsPlaying(prev => ({ ...prev, [index]: false }));
+      return;
+    }
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(word);
+    
+    // Get language code from the category
+    const langCode = languageCodeMap[category] || "en-US";
+    utterance.lang = langCode;
+    
+    // Get voices and set a voice that matches the language if available
+    let voices = window.speechSynthesis.getVoices();
+    
+    // If no voices are loaded yet, wait for them to load
+    if (voices.length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        voices = window.speechSynthesis.getVoices();
+        setVoiceAndSpeak(utterance, voices, langCode, index);
+      };
+    } else {
+      setVoiceAndSpeak(utterance, voices, langCode, index);
+    }
+  };
+  
+  const setVoiceAndSpeak = (utterance, voices, langCode, index) => {
+    // Find a voice that matches the language
+    const voice = voices.find(v => v.lang.startsWith(langCode.split('-')[0]));
+    if (voice) {
+      utterance.voice = voice;
+    }
+    
+    // Set event handlers
+    utterance.onend = () => {
+      setIsPlaying(prev => ({ ...prev, [index]: false }));
+    };
+    
+    utterance.onerror = () => {
+      console.error("Speech synthesis error");
+      setIsPlaying(prev => ({ ...prev, [index]: false }));
+    };
+    
+    // Speak
+    window.speechSynthesis.speak(utterance);
+  };
+  
+  const handleAudioEnded = (index) => {
+    setIsPlaying(prev => ({ ...prev, [index]: false }));
+  };
+  
+  const handleAudioError = (word, index) => {
+    // If audio fails to load, use speech synthesis instead
+    speakWordWithSynthesis(word, index);
+  };
+  
+  if (!isEnrolled) {
+    return null; // Only show vocabulary cards for enrolled students
+  }
+  
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 mb-8">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center">
+          <HiTranslate className="w-6 h-6 text-primary dark:text-secondary mr-2" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            Vocabulary Cards
+          </h2>
+        </div>
+        <button 
+          onClick={refreshWords}
+          className="flex items-center text-primary dark:text-secondary hover:underline"
+        >
+          <HiRefresh className="w-5 h-5 mr-1" />
+          New Words
+        </button>
+      </div>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        Click on the cards to reveal their definitions. Click the <HiVolumeUp className="inline w-4 h-4" /> icon to hear pronunciation.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {vocabularyWords.map((item, index) => (
+          <div 
+            key={index}
+            onClick={() => toggleFlip(index)}
+            className={`cursor-pointer transition-transform duration-500 transform-gpu ${
+              flippedCards[index] ? 'rotate-y-180' : ''
+            } perspective-1000 h-40`}
+          >
+            <div className="relative w-full h-full">
+              {/* Front of card */}
+              <div 
+                className={`absolute w-full h-full rounded-lg flex items-center justify-center shadow-md border-2 border-primary dark:border-secondary bg-indigo-50 dark:bg-gray-700 p-4 transition-opacity duration-500 ${
+                  flippedCards[index] ? 'opacity-0' : 'opacity-100'
+                }`}
+              >
+                <h3 className="text-xl font-bold text-center text-gray-900 dark:text-gray-100">
+                  {item.word}
+                </h3>
+                <button 
+                  onClick={(e) => playAudio(item.word, index, e)}
+                  className={`absolute top-2 right-2 text-primary dark:text-secondary transition-transform duration-200 ${
+                    isPlaying[index] ? 'scale-110' : ''
+                  }`}
+                  title="Play pronunciation"
+                >
+                  {isPlaying[index] ? (
+                    <HiVolumeUp className="w-5 h-5 animate-pulse" />
+                  ) : (
+                    <HiOutlineVolumeUp className="w-5 h-5" />
+                  )}
+                </button>
+                <audio
+                  ref={(el) => {
+                    if (el) {
+                      audioRefs.current[index] = el;
+                      el.addEventListener('ended', () => handleAudioEnded(index));
+                      el.addEventListener('error', () => handleAudioError(item.word, index));
+                    }
+                  }}
+                  src={`https://api.dictionaryapi.dev/media/pronunciations/en/${item.word.toLowerCase().replace(/\s*\(.*?\)\s*/g, '').trim()}.mp3`}
+                  preload="none"
+                />
+              </div>
+              
+              {/* Back of card */}
+              <div 
+                className={`absolute w-full h-full rounded-lg flex items-center justify-center shadow-md border-2 border-primary dark:border-secondary bg-primary/10 dark:bg-secondary/10 p-4 transition-opacity duration-500 ${
+                  flippedCards[index] ? 'opacity-100' : 'opacity-0'
+                }`}
+              >
+                <p className="text-sm text-center text-gray-700 dark:text-gray-300">{item.definition}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function CourseProgress({ totalLectures, completedLectures }) {
   const progress = (completedLectures / totalLectures) * 100;
@@ -341,61 +634,18 @@ function Certificate({ requirements, isEnrolled }) {
   );
 }
 
-function RelatedCourses({ currentCourseId, category }) {
-  const relatedCourses = courseData
-    .filter(course => course.category === category && course.id !== currentCourseId)
-    .slice(0, 3);
-
-  return (
-    <div className="bg-white dark:bg-gray-800/90 rounded-lg p-6 mb-8">
-      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
-        Related Courses
-      </h2>
-      <div className="space-y-4">
-        {relatedCourses.map(course => (
-          <Link
-            key={course.id}
-            to={`/course/${course.id}`}
-            className="block p-4 border rounded-lg hover:bg-indigo-50/80 dark:hover:bg-gray-700/80 transition-colors duration-150"
-          >
-            <div className="flex items-start">
-              <img
-                src={course.image}
-                alt={course.title}
-                className="w-20 h-20 object-cover rounded"
-              />
-              <div className="ml-4">
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">
-                  {course.title}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                  {course.instructor}
-                </p>
-                <div className="flex items-center">
-                  <span className="text-amber-500 font-semibold text-sm">
-                    {course.rating}
-                  </span>
-                  <div className="flex items-center ml-1">
-                    <HiStar className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
-                    ({course.students.toLocaleString()} students)
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function CourseDetail() {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isAuthenticated, user } = useAuth();
+  
+  const [course, setCourse] = useState(null);
+  const [courseSections, setCourseSections] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [relatedCourses, setRelatedCourses] = useState([]);
   
   // Check if user just completed enrollment
   useEffect(() => {
@@ -404,24 +654,107 @@ function CourseDetail() {
     }
   }, [searchParams]);
 
-  // Find the course from our data
-  const course = courseData.find(c => c.id === parseInt(courseId));
+  // Fetch course data from the API
+  useEffect(() => {
+    const fetchCourseData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch course details
+        const courseResponse = await axios.get(
+          `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/courses/${courseId}`
+        );
+        setCourse(courseResponse.data);
+        
+        // Check if user is enrolled (if authenticated)
+        if (isAuthenticated && user) {
+          try {
+            const enrollmentResponse = await axios.get(
+              `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/users/${user.id}/enrollments`,
+              {
+                headers: { 'x-auth-token': localStorage.getItem('token') }
+              }
+            );
+            
+            const enrolledCourses = enrollmentResponse.data || [];
+            setIsEnrolled(enrolledCourses.some(c => c._id === courseId));
+          } catch (enrollmentError) {
+            console.error('Error checking enrollment status:', enrollmentError);
+          }
+        }
+        
+        // Fetch course sections and content
+        try {
+          const sectionsResponse = await axios.get(
+            `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/courses/${courseId}/chapters`
+          );
+          setCourseSections(sectionsResponse.data || []);
+        } catch (sectionsError) {
+          console.error('Error fetching course sections:', sectionsError);
+          // Use mock sections if API fails
+          setCourseSections(mockCourseContent.sections);
+        }
+        
+        // Fetch related courses
+        if (courseResponse.data.category) {
+          try {
+            const relatedResponse = await axios.get(
+              `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/courses?category=${courseResponse.data.category}&limit=3&exclude=${courseId}`
+            );
+            setRelatedCourses(relatedResponse.data || []);
+          } catch (relatedError) {
+            console.error('Error fetching related courses:', relatedError);
+          }
+        }
+        
+      } catch (err) {
+        console.error('Error fetching course data:', err);
+        setError('Failed to load course information. Please try again later.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchCourseData();
+  }, [courseId, isAuthenticated, user]);
 
   // Calculate total lectures and completed lectures
-  const totalLectures = mockCourseContent.sections.reduce(
-    (sum, section) => sum + section.lectures.length, 
+  const totalLectures = courseSections.reduce(
+    (sum, section) => sum + (section.lectures?.length || 0), 
     0
   );
-  const completedLectures = mockCourseContent.sections.reduce(
-    (sum, section) => sum + section.lectures.filter(l => l.isCompleted).length,
+  const completedLectures = courseSections.reduce(
+    (sum, section) => sum + ((section.lectures?.filter(l => l.isCompleted)?.length) || 0),
     0
   );
 
-  if (!course) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-lightBg dark:bg-darkBg py-12">
         <div className="max-w-7xl mx-auto px-4">
-          <p className="text-center text-gray-600 dark:text-gray-400">Course not found</p>
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary dark:border-secondary"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading course information...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !course) {
+    return (
+      <div className="min-h-screen bg-lightBg dark:bg-darkBg py-12">
+        <div className="max-w-7xl mx-auto px-4">
+          <p className="text-center text-red-500 dark:text-red-400">{error || 'Course not found'}</p>
+          <div className="text-center mt-4">
+            <Link 
+              to="/courses"
+              className="bg-primary dark:bg-secondary text-white px-4 py-2 rounded-md hover:bg-primary/90 dark:hover:bg-secondary/90"
+            >
+              Browse All Courses
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -440,13 +773,13 @@ function CourseDetail() {
             <div>
               <h1 className="text-3xl font-bold mb-4">{course.title}</h1>
               <div className="flex items-center mb-4">
-                <span className="text-xl font-bold text-amber-500">{course.rating}</span>
+                <span className="text-xl font-bold text-amber-500">{course.rating || 0}</span>
                 <div className="flex items-center ml-2">
                   {[...Array(5)].map((_, i) => (
                     <HiStar
                       key={i}
                       className={`w-5 h-5 ${
-                        i < Math.floor(course.rating)
+                        i < Math.floor(course.rating || 0)
                           ? 'text-amber-500'
                           : 'text-gray-400'
                       }`}
@@ -454,11 +787,18 @@ function CourseDetail() {
                   ))}
                 </div>
                 <span className="ml-2 text-gray-400">
-                  ({course.students.toLocaleString()} students)
+                  ({course.students || 0} students)
                 </span>
               </div>
               <p className="text-gray-300 mb-4">
-                Created by <Link to={`/teacher/${course.instructorId}`} className="hover:text-primary dark:hover:text-secondary">{course.instructor}</Link>
+                Created by {course.instructor && (
+                  <Link 
+                    to={`/teacher/${course.instructor._id}`} 
+                    className="hover:text-primary dark:hover:text-secondary"
+                  >
+                    {course.instructor.name}
+                  </Link>
+                )}
               </p>
               <div className="flex items-center text-sm text-gray-400">
                 <span className="mr-4">{course.duration}</span>
@@ -468,7 +808,10 @@ function CourseDetail() {
             </div>
             <div className="bg-gray-800 p-6 rounded-lg">
               <img
-                src={course.image}
+                src={course.thumbnail ? 
+                  `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${course.thumbnail}` : 
+                  'https://via.placeholder.com/640x360?text=Course'
+                }
                 alt={course.title}
                 className="w-full rounded-lg mb-4"
               />
@@ -500,7 +843,7 @@ function CourseDetail() {
                 What You'll Learn
               </h2>
               <div className="grid md:grid-cols-2 gap-4">
-                {mockCourseContent.whatYouWillLearn.map((item, index) => (
+                {(course.whatYouWillLearn || mockCourseContent.whatYouWillLearn).map((item, index) => (
                   <div key={index} className="flex items-start">
                     <HiCheck className="w-5 h-5 text-green-500 mr-2 mt-1" />
                     <span className="text-gray-700 dark:text-gray-300">{item}</span>
@@ -515,7 +858,7 @@ function CourseDetail() {
                 Prerequisites
               </h2>
               <ul className="list-disc pl-5 space-y-2">
-                {mockCourseContent.prerequisites.map((prerequisite, index) => (
+                {(course.requirements || mockCourseContent.prerequisites).map((prerequisite, index) => (
                   <li key={index} className="text-gray-700 dark:text-gray-300">
                     {prerequisite}
                   </li>
@@ -529,7 +872,7 @@ function CourseDetail() {
                 Description
               </h2>
               <div className="prose dark:prose-invert">
-                {mockCourseContent.description.split('\n\n').map((paragraph, index) => (
+                {(course.description || "").split('\n\n').map((paragraph, index) => (
                   <p key={index} className="mb-4 text-gray-700 dark:text-gray-300">
                     {paragraph}
                   </p>
@@ -549,11 +892,63 @@ function CourseDetail() {
               isEnrolled={isEnrolled}
             />
 
-            {/* Related Courses */}
-            <RelatedCourses
-              currentCourseId={parseInt(courseId)}
+            {/* Vocabulary Cards */}
+            <VocabularyCards 
               category={course.category}
+              isEnrolled={isEnrolled}
             />
+
+            {/* Related Courses */}
+            <div className="bg-white dark:bg-gray-800/90 rounded-lg p-6 mb-8">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
+                Related Courses
+              </h2>
+              {relatedCourses.length > 0 ? (
+                <div className="space-y-4">
+                  {relatedCourses.map(course => (
+                    <Link
+                      key={course._id}
+                      to={`/course/${course._id}`}
+                      className="block p-4 border rounded-lg hover:bg-indigo-50/80 dark:hover:bg-gray-700/80 transition-colors duration-150"
+                    >
+                      <div className="flex items-start">
+                        <img
+                          src={course.thumbnail ? 
+                            `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${course.thumbnail}` : 
+                            'https://via.placeholder.com/80x80?text=Course'
+                          }
+                          alt={course.title}
+                          className="w-20 h-20 object-cover rounded"
+                        />
+                        <div className="ml-4">
+                          <h3 className="font-medium text-gray-900 dark:text-gray-100">
+                            {course.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                            {course.instructor ? course.instructor.name : 'Unknown Instructor'}
+                          </p>
+                          <div className="flex items-center">
+                            <span className="text-amber-500 font-semibold text-sm">
+                              {course.rating || "N/A"}
+                            </span>
+                            <div className="flex items-center ml-1">
+                              <HiStar className="w-4 h-4 text-amber-500" />
+                            </div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+                              ({course.students || 0} students)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-600 dark:text-gray-400 italic">
+                  No related courses found.
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Course Content Sidebar */}
@@ -563,14 +958,11 @@ function CourseDetail() {
                 Course Content
               </h2>
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                {totalLectures} lectures • {mockCourseContent.sections.reduce(
-                  (total, section) => total + parseFloat(section.duration),
-                  0
-                )} hours total
+                {totalLectures} lectures • {courseSections.length} sections
               </div>
-              {mockCourseContent.sections.map(section => (
+              {courseSections.map(section => (
                 <CourseSection
-                  key={section.id}
+                  key={section._id || section.id}
                   section={section}
                   isEnrolled={isEnrolled}
                 />

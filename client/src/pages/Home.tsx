@@ -333,7 +333,7 @@ const Home: React.FC = () => {
                     <p>GPA: {student.gpa}</p>
                     <p>Exam Score: {student.examScore}%</p>
                     <p className="text-primary dark:text-secondary font-medium">
-                      Achievement: {student.achievements[0]}
+                      Achievement: {student.achievements && student.achievements.length > 0 ? student.achievements[0] : 'None'}
                     </p>
                   </div>
                 </div>

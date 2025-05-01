@@ -1,3 +1,4 @@
+cd client
 const mongoose = require('mongoose');
 const User = require('../models/User');
 require('dotenv').config({ path: '../.env' });
@@ -18,14 +19,14 @@ const createAdminUser = async () => {
         const adminUser = new User({
             name: 'Admin User',
             email: 'admin@eduportal.com',
-            password: 'admin123456', // Change this in production
+            password: 'Abdulazizov99$', // Change this in production
             role: 'admin'
         });
 
         await adminUser.save();
         console.log('Admin user created successfully');
         console.log('Email: admin@eduportal.com');
-        console.log('Password: admin123456');
+        console.log('Password: **********');
         console.log('Please change the password after first login');
     } catch (error) {
         console.error('Error creating admin user:', error);

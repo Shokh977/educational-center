@@ -16,10 +16,32 @@ const contentSchema = new mongoose.Schema({
     trim: true
   },
   file: {
-    type: String, // URL to the file (video or PDF)
+    type: String, // URL to the file (PDF) or legacy storage path
     required: function() {
-      return this.type === 'video' || this.type === 'pdf';
+      // Only require file field for PDF type
+      return this.type === 'pdf';
     }
+  },
+  // Mux Video specific fields
+  muxAssetId: {
+    type: String,
+    required: function() {
+      return this.type === 'video' && this.status === 'ready';
+    }
+  },
+  muxPlaybackId: {
+    type: String,
+    required: function() {
+      return this.type === 'video' && this.status === 'ready';
+    }
+  },
+  status: {
+    type: String,
+    enum: ['draft', 'processing', 'ready', 'error', 'deleted', 'upload_cancelled'],
+    default: 'draft'
+  },
+  uploadUrl: {
+    type: String, // Temporary field for direct upload URL
   },
   duration: {
     type: String, // Duration for videos in format "HH:MM:SS"
@@ -49,7 +71,8 @@ const contentSchema = new mongoose.Schema({
   }],
   order: {
     type: Number,
-    required: true
+    required: true,
+    default: 1 // Default value for order
   }
 });
 

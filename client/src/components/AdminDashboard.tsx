@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { HiAcademicCap, HiUserGroup, HiBookOpen, HiPlus, HiPencil, HiTrash, HiCheck, HiX } from 'react-icons/hi';
+import { HiAcademicCap, HiUserGroup, HiBookOpen, HiPlus, HiPencil, HiTrash, HiCheck, HiX, HiDocumentText } from 'react-icons/hi';
+import UserProfile from './UserProfile';
+import BlogManagement from './admin/BlogManagement';
 import axios from 'axios';
 
 interface User {
@@ -18,22 +20,45 @@ interface Course {
     name: string;
   };
   category: string;
-  status: 'active' | 'inactive';
+  status: 'draft' | 'published' | 'archived';
+  totalLessons?: number;
+  totalDuration?: string; 
+  updatedAt?: string;
+  thumbnail?: string;
 }
 
 const AdminDashboard: React.FC = () => {
-  const { user, token } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'courses' | 'settings'>('users');
+  const { user, token, updateProfile } = useAuth();
+  const [activeTab, setActiveTab] = useState<'users' | 'courses' | 'blog' | 'settings'>('users');
   const [users, setUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [passwordData, setPasswordData] = useState({
+  const [error, setError] = useState<string | null>(null);  const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
   const [passwordChangeMessage, setPasswordChangeMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
+
+  // Function to handle profile updates
+  const handleProfileUpdate = async (name: string, imageFile: File | null) => {
+    try {
+      await updateProfile(name, imageFile);
+      setShowProfileEditor(false);
+      // Show success message
+      setPasswordChangeMessage({
+        type: 'success',
+        text: 'Profile updated successfully!'
+      });
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      setPasswordChangeMessage({
+        type: 'error',
+        text: 'Failed to update profile. Please try again.'
+      });
+    }
+  };
 
   useEffect(() => {
     // Fetch users and courses data
@@ -118,7 +143,7 @@ const AdminDashboard: React.FC = () => {
       const course = courses.find(c => c._id === courseId);
       if (!course) return;
       
-      const newStatus = course.status === 'active' ? 'inactive' : 'active';
+      const newStatus = course.status === 'draft' ? 'published' : course.status === 'published' ? 'archived' : 'draft';
 
       await axios.patch(
         `${process.env.REACT_APP_API_URL}/api/admin/courses/${courseId}/status`,
@@ -132,11 +157,30 @@ const AdminDashboard: React.FC = () => {
       );
 
       setCourses(courses.map(course =>
-        course._id === courseId ? { ...course, status: newStatus as 'active' | 'inactive' } : course
+        course._id === courseId ? { ...course, status: newStatus as 'draft' | 'published' | 'archived' } : course
       ));
     } catch (error) {
       console.error('Error updating course status:', error);
       alert('Failed to update course status. Please try again.');
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (window.confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
+      try {
+        await axios.delete(
+          `${process.env.REACT_APP_API_URL}/api/admin/courses/${courseId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        setCourses(courses.filter(course => course._id !== courseId));
+      } catch (error) {
+        console.error('Error deleting course:', error);
+        alert('Failed to delete course. Please try again.');
+      }
     }
   };
 
@@ -270,7 +314,7 @@ const AdminDashboard: React.FC = () => {
                   Active Courses
                 </p>
                 <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-                  {courses.filter(c => c.status === 'active').length}
+                  {courses.filter(c => c.status === 'published').length}
                 </p>
               </div>
             </div>
@@ -288,9 +332,7 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Tab Navigation */}
+        </div>        {/* Tab Navigation */}
         <div className="border-b dark:border-gray-700 mb-8">
           <nav className="-mb-px flex space-x-8">
             <button
@@ -312,6 +354,16 @@ const AdminDashboard: React.FC = () => {
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
               Course Management
+            </button>
+            <button
+              onClick={() => setActiveTab('blog')}
+              className={`${
+                activeTab === 'blog'
+                  ? 'border-primary dark:border-secondary text-primary dark:text-secondary'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Blog Management
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -398,9 +450,13 @@ const AdminDashboard: React.FC = () => {
                 <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
                   Courses
                 </h2>
-                <button className="bg-primary dark:bg-secondary text-white px-4 py-2 rounded-md hover:bg-primary/90 dark:hover:bg-secondary/90">
+                <a 
+                  href="/admin/courses/create" 
+                  className="bg-primary dark:bg-secondary text-white px-4 py-2 rounded-md hover:bg-primary/90 dark:hover:bg-secondary/90 flex items-center"
+                >
+                  <HiPlus className="w-5 h-5 mr-2" />
                   Add Course
-                </button>
+                </a>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -416,6 +472,12 @@ const AdminDashboard: React.FC = () => {
                         Category
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Lessons
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Duration
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -426,8 +488,17 @@ const AdminDashboard: React.FC = () => {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {courses.map(course => (
                       <tr key={course._id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                          {course.title}
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">
+                          <div className="flex items-center">
+                            {course.thumbnail && (
+                              <img 
+                                src={`${process.env.REACT_APP_API_URL}${course.thumbnail}`} 
+                                alt={course.title}
+                                className="h-10 w-16 object-cover rounded mr-3"
+                              />
+                            )}
+                            <span>{course.title}</span>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {course.instructor?.name || 'Unknown Instructor'}
@@ -435,11 +506,19 @@ const AdminDashboard: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {course.category}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {course.totalLessons || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {course.totalDuration || '0h 0m'}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              course.status === 'active'
+                              course.status === 'published'
                                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : course.status === 'draft'
+                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                                 : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                             }`}
                           >
@@ -447,34 +526,106 @@ const AdminDashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleToggleCourseStatus(course._id)}
-                            className={`mr-2 ${
-                              course.status === 'active'
-                                ? 'text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300'
-                                : 'text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300'
-                            }`}
-                          >
-                            {course.status === 'active' ? (
-                              <HiX className="w-5 h-5" />
-                            ) : (
-                              <HiCheck className="w-5 h-5" />
+                          <div className="flex justify-end space-x-2">
+                            {course.status === 'draft' && (
+                              <button
+                                onClick={() => handleToggleCourseStatus(course._id)}
+                                title="Publish Course"
+                                className="text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300"
+                              >
+                                <HiCheck className="w-5 h-5" />
+                              </button>
                             )}
-                          </button>
-                          <button className="text-primary dark:text-secondary hover:text-primary/90 dark:hover:text-secondary/90">
-                            <HiPencil className="w-5 h-5" />
-                          </button>
+                            {course.status === 'published' && (
+                              <button
+                                onClick={() => handleToggleCourseStatus(course._id)}
+                                title="Unpublish Course"
+                                className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-300"
+                              >
+                                <HiX className="w-5 h-5" />
+                              </button>
+                            )}
+                            <a
+                              href={`/admin/courses/edit/${course._id}`}
+                              title="Edit Course"
+                              className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
+                            >
+                              <HiPencil className="w-5 h-5" />
+                            </a>
+                            <a
+                              href={`/admin/course/${course._id}/content`}
+                              title="Manage Content"
+                              className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-900 dark:hover:text-indigo-300"
+                            >
+                              <HiBookOpen className="w-5 h-5" />
+                            </a>
+                            <button
+                              onClick={() => handleDeleteCourse(course._id)}
+                              title="Delete Course"
+                              className="text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300"
+                            >
+                              <HiTrash className="w-5 h-5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
+                    {courses.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                          No courses found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>                </table>
               </div>
             </div>
+          </div>
+        ) : activeTab === 'blog' ? (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <BlogManagement />
           </div>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
             <div className="px-4 py-5 sm:p-6">
+              {/* Profile Section */}
+              <div className="mb-10">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    Profile Settings
+                  </h2>
+                  <button 
+                    onClick={() => setShowProfileEditor(prev => !prev)} 
+                    className="px-3 py-1 bg-primary text-white rounded hover:bg-primary-dark text-sm"
+                  >
+                    {showProfileEditor ? 'Cancel' : 'Edit Profile'}
+                  </button>
+                </div>
+                
+                {showProfileEditor ? (
+                  <UserProfile 
+                    currentName={user?.name || ''} 
+                    currentImage={user?.profileImage || 'https://via.placeholder.com/150'} 
+                    onSave={handleProfileUpdate}
+                  />
+                ) : (
+                  <div className="flex items-center">
+                    <img 
+                      src={user?.profileImage || 'https://via.placeholder.com/150'} 
+                      alt="Profile" 
+                      className="w-20 h-20 rounded-full object-cover mr-4"
+                    />
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100">{user?.name}</h3>
+                      <p className="text-gray-500 dark:text-gray-400">{user?.email}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Role: {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-6">
                 Change Password
               </h2>

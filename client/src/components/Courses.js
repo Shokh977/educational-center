@@ -23,6 +23,7 @@ function Courses() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [totalCourses, setTotalCourses] = useState(0);
+  const [debugInfo, setDebugInfo] = useState(null);
 
   // Fetch courses based on filters
   useEffect(() => {
@@ -42,18 +43,32 @@ function Courses() {
           params.append('search', searchQuery);
         }
         
+        // Get the API URL
+        const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+        const fullUrl = `${apiUrl}/api/public/courses?${params.toString()}`;
+        
+        // Set debug info
+        setDebugInfo({
+          apiUrl: apiUrl,
+          fullUrl: fullUrl,
+          params: Object.fromEntries(params.entries())
+        });
+        
+        console.log('Fetching courses from:', fullUrl);
+        
         // Make API request
-        const response = await axios.get(
-          `${process.env.REACT_APP_API_URL}/api/public/courses?${params.toString()}`
-        );
+        const response = await axios.get(fullUrl);
+        
+        // Log response for debugging
+        console.log('API response:', response.data);
         
         // Update state with fetched data
         setCourses(response.data);
-        setTotalCourses(response.data.length); // For display purposes
+        setTotalCourses(response.data.length);
         setError(null);
       } catch (err) {
         console.error('Error fetching courses:', err);
-        setError('Failed to load courses. Please try again later.');
+        setError(`Failed to load courses: ${err.message}. ${err.response?.data?.message || ''}`);
       } finally {
         setLoading(false);
       }
@@ -70,8 +85,9 @@ function Courses() {
       // and set the category filter based on that course's category
       const fetchCourseDetails = async () => {
         try {
+          const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
           const response = await axios.get(
-            `${process.env.REACT_APP_API_URL}/api/public/courses/${courseId}`
+            `${apiUrl}/api/public/courses/${courseId}`
           );
           if (response.data) {
             setSelectedCategory(response.data.category);
@@ -135,16 +151,51 @@ function Courses() {
     </>
   );
 
-  // Error component
+  // Error component with debugging information
   const ErrorMessage = () => (
     <div className="col-span-full text-center py-8">
       <p className="text-red-500 dark:text-red-400 text-lg mb-4">{error}</p>
-      <button 
-        onClick={() => window.location.reload()}
-        className="px-4 py-2 bg-primary dark:bg-secondary text-white rounded hover:bg-primary/90 dark:hover:bg-secondary/90"
-      >
-        Try Again
-      </button>
+      
+      {debugInfo && (
+        <details className="mb-4 text-left bg-gray-100 dark:bg-gray-800 p-4 rounded-lg inline-block max-w-lg">
+          <summary className="cursor-pointer font-medium">Debug Information</summary>
+          <div className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+            <p><strong>API URL:</strong> {debugInfo.apiUrl}</p>
+            <p><strong>Full URL:</strong> {debugInfo.fullUrl}</p>
+            <p><strong>Parameters:</strong> {JSON.stringify(debugInfo.params, null, 2)}</p>
+            <p className="mt-2 italic">
+              Make sure your backend server is running and accessible at this URL.
+            </p>
+          </div>
+        </details>
+      )}
+      
+      <div className="flex justify-center gap-4">
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary dark:bg-secondary text-white rounded hover:bg-primary/90 dark:hover:bg-secondary/90"
+        >
+          Try Again
+        </button>
+        
+        <button 
+          onClick={() => {
+            // Try to use static data as fallback
+            import('../components/FeaturedCourses').then(module => {
+              if (module.courseData) {
+                setCourses(module.courseData);
+                setTotalCourses(module.courseData.length);
+                setError(null);
+              }
+            }).catch(err => {
+              console.error('Error loading static data:', err);
+            });
+          }}
+          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+        >
+          Use Demo Data
+        </button>
+      </div>
     </div>
   );
 

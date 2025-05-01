@@ -21,6 +21,16 @@ const courseSchema = new mongoose.Schema({
         required: [true, 'Category is required'],
         trim: true
     },
+    // New tags field for searchable keywords
+    tags: [{
+        type: String,
+        trim: true
+    }],
+    // New requirements field for course prerequisites
+    requirements: [{
+        type: String,
+        trim: true
+    }],
     duration: {
         type: String,  // Changed from Number to String to support formats like "8 weeks"
         required: [true, 'Duration is required']

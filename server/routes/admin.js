@@ -114,14 +114,59 @@ router.delete('/users/:userId', adminAuth, async (req, res) => {
     }
 });
 
-// Get all courses
+// Get all courses with statistics for admin
 router.get('/courses', adminAuth, async (req, res) => {
-    try {
-        const courses = await Course.find();
-        res.json(courses);
-    } catch (error) {
-        res.status(500).json({ message: 'Error fetching courses', error: error.message });
-    }
+  try {
+    // Fetch all courses with instructor info, chapters, and calculate statistics
+    const courses = await Course.find()
+      .populate('instructor', 'name email')
+      .populate('chapters')
+      .lean();
+    
+    // Process courses to include statistics
+    const processedCourses = courses.map(course => {
+      let totalLessons = 0;
+      let totalMinutes = 0;
+      
+      // Calculate total lessons and duration from chapters
+      if (course.chapters && course.chapters.length > 0) {
+        course.chapters.forEach(chapter => {
+          if (chapter.contents && chapter.contents.length) {
+            totalLessons += chapter.contents.length;
+            
+            // Calculate duration from video content
+            chapter.contents.forEach(content => {
+              if (content.type === 'video' && content.duration) {
+                // Parse duration like "10:30" to minutes
+                const parts = content.duration.split(':');
+                if (parts.length === 2) {
+                  totalMinutes += (parseInt(parts[0]) * 60) + parseInt(parts[1]);
+                }
+              }
+            });
+          }
+        });
+      }
+      
+      // Format total duration to hours and minutes
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      const formattedDuration = `${hours}h ${minutes}m`;
+      
+      return {
+        ...course,
+        totalLessons,
+        totalDuration: formattedDuration,
+      };
+    });
+    
+    res.json(processedCourses);
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error fetching courses', 
+      error: error.message 
+    });
+  }
 });
 
 // Create course
@@ -134,16 +179,23 @@ router.post('/courses', [authMiddleware, adminMiddleware, upload.single('thumbna
       `/uploads/thumbnails/${path.basename(req.file.path)}` : 
       'default-course.jpg';
     
+    // Parse tags and requirements from JSON strings if they exist
+    const tags = req.body.tags ? JSON.parse(req.body.tags) : [];
+    const requirements = req.body.requirements ? JSON.parse(req.body.requirements) : [];
+    
     // Create the course
     const course = new Course({
       title,
       description,
       instructor: req.user.id, // Current admin user is the instructor
       category,
+      tags,
+      requirements,
       duration,
       price: parseFloat(price),
       level,
-      thumbnail
+      thumbnail,
+      status: req.body.status || 'draft' // Allow setting initial status, default to draft
     });
     
     await course.save();
@@ -155,28 +207,136 @@ router.post('/courses', [authMiddleware, adminMiddleware, upload.single('thumbna
   }
 });
 
-// Update course status
-router.patch('/courses/:courseId/status', adminAuth, async (req, res) => {
-    try {
-        const { status } = req.body;
-        if (!['active', 'inactive'].includes(status)) {
-            return res.status(400).json({ message: 'Invalid status' });
-        }
-
-        const course = await Course.findByIdAndUpdate(
-            req.params.courseId,
-            { status },
-            { new: true }
-        );
-
-        if (!course) {
-            return res.status(404).json({ message: 'Course not found' });
-        }
-
-        res.json(course);
-    } catch (error) {
-        res.status(500).json({ message: 'Error updating course status', error: error.message });
+// Save course draft
+router.post('/courses/drafts', [authMiddleware, adminMiddleware, upload.single('thumbnail')], async (req, res) => {
+  try {
+    const { 
+      title, 
+      description, 
+      category, 
+      price, 
+      level, 
+      duration, 
+      draftId 
+    } = req.body;
+    
+    // Get the thumbnail path if uploaded
+    const thumbnail = req.file ? 
+      `/uploads/thumbnails/${path.basename(req.file.path)}` : 
+      undefined;
+    
+    // Parse tags and requirements if they exist
+    const tags = req.body.tags ? JSON.parse(req.body.tags) : [];
+    const requirements = req.body.requirements ? JSON.parse(req.body.requirements) : [];
+    
+    let course;
+    
+    // If draftId is provided, update the existing draft
+    if (draftId) {
+      course = await Course.findOne({ _id: draftId, instructor: req.user.id, status: 'draft' });
+      
+      if (!course) {
+        return res.status(404).json({ message: 'Draft not found or you are not authorized to edit it' });
+      }
+      
+      // Update the course draft
+      if (title) course.title = title;
+      if (description) course.description = description;
+      if (category) course.category = category;
+      if (price) course.price = parseFloat(price);
+      if (level) course.level = level;
+      if (duration) course.duration = duration;
+      if (thumbnail) course.thumbnail = thumbnail;
+      if (tags.length > 0) course.tags = tags;
+      if (requirements.length > 0) course.requirements = requirements;
+      
+      course.updatedAt = new Date();
+    } else {
+      // Create a new draft
+      course = new Course({
+        title: title || 'Untitled Course',
+        description: description || '',
+        instructor: req.user.id,
+        category: category || '',
+        tags,
+        requirements,
+        duration: duration || '',
+        price: price ? parseFloat(price) : 0,
+        level: level || 'beginner',
+        thumbnail: thumbnail || 'default-course.jpg',
+        status: 'draft'
+      });
     }
+    
+    await course.save();
+    
+    res.status(201).json({ message: 'Draft saved successfully', courseId: course._id });
+  } catch (err) {
+    console.error('Error saving draft:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get all course drafts for the current user
+router.get('/courses/drafts', [authMiddleware, adminMiddleware], async (req, res) => {
+  try {
+    const drafts = await Course.find({ 
+      instructor: req.user.id, 
+      status: 'draft' 
+    }).select('title thumbnail updatedAt');
+    
+    res.json(drafts);
+  } catch (err) {
+    console.error('Error fetching drafts:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Get a specific draft by ID
+router.get('/courses/drafts/:id', [authMiddleware, adminMiddleware], async (req, res) => {
+  try {
+    const draft = await Course.findOne({ 
+      _id: req.params.id, 
+      instructor: req.user.id, 
+      status: 'draft' 
+    });
+    
+    if (!draft) {
+      return res.status(404).json({ message: 'Draft not found or you are not authorized to view it' });
+    }
+    
+    res.json(draft);
+  } catch (err) {
+    console.error('Error fetching draft:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// Update course status (draft, published, archived)
+router.patch('/courses/:courseId/status', adminAuth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['draft', 'published', 'archived'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status. Status must be draft, published, or archived' });
+    }
+
+    const course = await Course.findByIdAndUpdate(
+      req.params.courseId,
+      { status },
+      { new: true }
+    );
+
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    res.json(course);
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Error updating course status', 
+      error: error.message 
+    });
+  }
 });
 
 // Delete course
@@ -432,6 +592,56 @@ router.post('/chapters/:chapterId/content', auth, admin, upload.single('file'), 
     res.status(201).json(content);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+// Preview uploaded content file (for videos and PDFs)
+router.post('/preview-content', [authMiddleware, adminMiddleware, upload.single('file')], async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    
+    const fileType = req.file.mimetype.split('/')[0];
+    const filePath = req.file.path;
+    const fileUrl = `/uploads/content/${path.basename(filePath)}`;
+    let metadata = {};
+    
+    // Get metadata about the file
+    if (fileType === 'video') {
+      // You can use packages like fluent-ffmpeg to get video metadata
+      // For this implementation, we'll just return basic info
+      metadata = {
+        type: 'video',
+        size: req.file.size,
+        format: req.file.mimetype.split('/')[1],
+        duration: req.body.duration || 'unknown',
+        preview: fileUrl
+      };
+    } else if (req.file.mimetype === 'application/pdf') {
+      // For PDF, we could extract the number of pages, but we'll keep it simple
+      metadata = {
+        type: 'pdf',
+        size: req.file.size,
+        format: 'pdf',
+        preview: fileUrl
+      };
+    } else {
+      return res.status(400).json({ message: 'Unsupported file type' });
+    }
+    
+    // Store this as a temporary file with TTL (time to live)
+    // For a full implementation, you'd want to clean up these temp files later
+    
+    res.json({
+      success: true,
+      fileUrl,
+      metadata,
+      message: 'File uploaded and preview generated'
+    });
+  } catch (err) {
+    console.error('Error generating preview:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 

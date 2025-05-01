@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db'); // Import the connectDB function
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
+const uploadRoutes = require('./routes/upload');
 const net = require('net');
 
 const app = express();
@@ -94,11 +95,10 @@ const startServer = async () => {
     const uploadsDir = path.join(__dirname, 'uploads');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    // Register routes
+    }    // Register routes
     app.use('/api/auth', authRoutes);
     app.use('/api/admin', adminRoutes);
+    app.use('/api/upload', uploadRoutes); // Add this line to register upload routes
     
     // Add other routes
     const publicRoutes = require('./routes/public');
@@ -109,7 +109,16 @@ const startServer = async () => {
 
     const usersRoutes = require('./routes/users');
     app.use('/api/users', usersRoutes);
-
+    
+    const modulesRoutes = require('./routes/modules');
+    app.use('/api/modules', modulesRoutes);
+    
+    // Add profile routes for consistent user data updates
+    const profileRoutes = require('./routes/profile');
+    app.use('/api/profile', profileRoutes);    // Add secure videos routes for Mux integration
+    const secureVideosRoutes = require('./routes/secureVideos');
+    app.use('/api/secure-videos', secureVideosRoutes);
+    
     // Error handling middleware
     app.use((err, req, res, next) => {
       console.error('Server error:', err);

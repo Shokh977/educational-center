@@ -19,8 +19,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import StudentDashboard from './components/StudentDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import AdminDashboard from './components/AdminDashboard';
-import Blog from './pages/Blog';
-import BlogPostDetail from './pages/BlogPostDetail';
+import CreateCourse from './components/CreateCourse';
+import CourseContentManager from './components/admin/CourseContentManager';
 
 const App: React.FC = () => {
   const [darkMode, setDarkMode] = useState(true);
@@ -97,11 +97,32 @@ const App: React.FC = () => {
                     </ProtectedRoute>
                   } 
                 />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/login" element={<Login />} />
+                <Route path="/contact" element={<Contact />} />                <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/blog" element={<Blog />} />
-                <Route path="/blog/:slug" element={<BlogPostDetail />} />
+                <Route 
+                  path="/admin/courses/create" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <CreateCourse />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/admin/courses/edit/:courseId" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <CreateCourse />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/admin/course/:courseId/content" 
+                  element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <CourseContentManager />
+                    </ProtectedRoute>
+                  } 
+                />
               </Routes>
             </main>
 

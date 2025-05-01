@@ -33,14 +33,11 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleDarkMode, isDarkMode }) => {
             default:
                 return '/';
         }
-    };
-
-    const renderNavLinks = () => {
+    };    const renderNavLinks = () => {
         const commonLinks = [
             { to: '/', text: 'Home' },
             { to: '/courses', text: 'Courses' },
             { to: '/teachers', text: 'Teachers' },
-            { to: '/blog', text: 'Blog' },
         ];
 
         const adminLinks = [
@@ -127,15 +124,34 @@ const Navbar: React.FC<NavbarProps> = ({ onToggleDarkMode, isDarkMode }) => {
                             ) : (
                                 <HiMoon className="w-6 h-6 text-gray-600" />
                             )}
-                        </button>
-
-                        {user ? (
+                        </button>                        {user ? (
                             <div className="relative">
                                 <button
                                     onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                                    className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-secondary"
-                                >
-                                    <HiUserCircle className="w-8 h-8" />
+                                    className="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-primary dark:hover:text-secondary"                                >
+                                    {user.profileImage ? (
+                                        <>
+                                        {console.log('Profile image URL:', user.profileImage)}
+                                        <img 
+                                            src={user.profileImage} 
+                                            alt={user.name} 
+                                            className="w-8 h-8 rounded-full object-cover"
+                                            onError={(e) => {
+                                                console.error('Error loading profile image');
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                // Fall back to the user icon
+                                                const parent = (e.target as HTMLElement).parentElement;
+                                                if (parent) {
+                                                    const icon = document.createElement('span');
+                                                    icon.className = "w-8 h-8";
+                                                    parent.appendChild(icon);
+                                                }
+                                            }}
+                                        />
+                                        </>
+                                    ) : (
+                                        <HiUserCircle className="w-8 h-8" />
+                                    )}
                                     <span className="hidden md:block">{user.name}</span>
                                 </button>
 

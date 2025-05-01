@@ -5,6 +5,7 @@ interface User {
     name: string;
     email: string;
     role: 'student' | 'teacher' | 'admin';
+    profileImage?: string;
 }
 
 interface AuthContextType {
@@ -14,6 +15,7 @@ interface AuthContextType {
     login: (email: string, password: string) => Promise<void>;
     register: (name: string, email: string, password: string, role: 'student' | 'teacher') => Promise<void>;
     logout: () => void;
+    updateProfile: (name: string, imageFile: File | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,7 +25,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
     const [loading, setLoading] = useState(true);
 
-    const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+    // Fix API_BASE_URL - remove redundant /api if it's already in the environment variable
+    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+    // Remove trailing /api if it exists to prevent duplication
+    const API_BASE_URL = API_URL.endsWith('/api') ? API_URL : `${API_URL}/api`;
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -56,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (response.ok) {
                     setUser(data);
                 } else {
+                    console.error('Failed to validate token:', data);
                     localStorage.removeItem('token');
                     setToken(null);
                 }
@@ -85,9 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
             // Get raw response text for debugging
             const text = await response.text();
-            console.log('Raw login response:', text);
-    
-            let data;
+            console.log('Raw login response:', text);            let data;
             try {
                 data = JSON.parse(text);
             } catch (parseError) {
@@ -96,15 +100,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
     
             if (!response.ok) {
+                console.error('Login failed:', data);
                 throw new Error(data.message || 'Failed to login');
             }
+            
+            // Log successful login data for debugging
+            console.log('Login successful, received data:', {
+                token: data.token ? 'Token received' : 'No token',
+                user: data.user ? `User with role: ${data.user.role}` : 'No user data',
+            });
     
             if (!data.token || !data.user) {
                 console.error('Invalid response format:', data);
                 throw new Error('Invalid response format from server');
             }
     
+            // Store token in localStorage AND a session cookie for better persistence
             localStorage.setItem('token', data.token);
+            document.cookie = `auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+            
             setToken(data.token);
             setUser(data.user);
         } catch (error) {
@@ -133,9 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             let data;
             let text;
             try {
-                // First try to get the raw text
                 text = await response.text();
-                // Then try to parse it as JSON
                 try {
                     data = JSON.parse(text);
                 } catch (parseError) {
@@ -156,11 +168,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 throw new Error('Invalid response format from server');
             }
 
+            // Store token in localStorage AND a session cookie for better persistence
             localStorage.setItem('token', data.token);
+            document.cookie = `auth_token=${data.token}; path=/; max-age=86400; SameSite=Lax`;
+            
             setToken(data.token);
             setUser(data.user);
-        } catch (error: any) {
-            console.error('Registration error details:', error);
+        } catch (error: any) {            console.error('Registration error details:', error);
             if (error instanceof TypeError && error.message === 'Failed to fetch') {
                 throw new Error('Network error. Please check your connection.');
             }
@@ -172,12 +186,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const logout = () => {
         localStorage.removeItem('token');
+        // Also clear the cookie
+        document.cookie = 'auth_token=; path=/; max-age=0; SameSite=Lax';
         setToken(null);
         setUser(null);
+    };    // Add the updateProfile function
+    const updateProfile = async (name: string, imageFile: File | null) => {
+        try {
+            if (!token || !user) {
+                throw new Error('You must be logged in to update your profile');
+            }
+
+            let imageUrl = user.profileImage; // Use existing profile image if no new one is provided
+
+            try {
+                // Use Cloudinary for image upload instead of Firebase
+                if (imageFile) {
+                    const { updateUserProfileWithCloudinary } = await import('../services/cloudinary');
+                    const newImageUrl = await updateUserProfileWithCloudinary(name, imageFile, user.id);
+                    
+                    // If a new image was uploaded, update the imageUrl variable
+                    if (newImageUrl) {
+                        imageUrl = newImageUrl;
+                    }
+                }
+            } catch (profileUpdateError) {
+                console.error('Error updating profile image:', profileUpdateError);
+                // Continue with the backend update even if image upload fails
+            }
+
+            // Update the user profile in your backend
+            const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, profileImage: imageUrl })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update profile');
+            }
+
+            // Update the local user state
+            setUser(prev => prev ? { ...prev, name, profileImage: imageUrl } : null);
+            
+            return;
+        } catch (error) {
+            console.error('Error updating profile:', error);
+            throw error;
+        }
     };
 
-    return (
-        <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    // Helper function to retrieve token from cookies (for refresh persistence)
+    const getTokenFromCookies = () => {
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'auth_token') {
+                return value;
+            }
+        }
+        return null;
+    };
+
+    // On initialization, try to recover token from cookies if not in localStorage
+    useEffect(() => {
+        if (!token) {
+            const cookieToken = getTokenFromCookies();
+            if (cookieToken) {
+                localStorage.setItem('token', cookieToken);
+                setToken(cookieToken);
+            }
+        }
+    }, []);    return (
+        <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateProfile }}>
             {children}
         </AuthContext.Provider>
     );

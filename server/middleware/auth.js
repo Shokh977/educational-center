@@ -3,17 +3,44 @@ const User = require('../models/User');
 
 const auth = async (req, res, next) => {
     try {
-        const token = req.cookies.token;
+        // Look for token in multiple places: Authorization header, cookies, or query params
+        let token = null;
+        
+        // Check Authorization header first (Bearer token)
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.split(' ')[1];
+        }
+        
+        // If no token in header, check cookies
+        if (!token && req.cookies && req.cookies.token) {
+            token = req.cookies.token;
+        }
+        
+        // If still no token, check query params (for special cases)
+        if (!token && req.query && req.query.token) {
+            token = req.query.token;
+        }
         
         if (!token) {
-            throw new Error('No token found');
+            console.log('No auth token found in request');
+            return res.status(401).json({ message: 'Authentication required. No token provided.' });
         }
 
+        // Verify the token
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        
+        if (!decoded || !decoded.userId) {
+            console.log('Invalid token format:', decoded);
+            return res.status(401).json({ message: 'Invalid token format' });
+        }
+        
+        // Get user from database
         const user = await User.findById(decoded.userId);
 
         if (!user) {
-            throw new Error('User not found');
+            console.log('User not found for token userId:', decoded.userId);
+            return res.status(401).json({ message: 'User not found' });
         }
 
         // Update last active timestamp
@@ -21,10 +48,14 @@ const auth = async (req, res, next) => {
             lastActive: new Date()
         });
 
-        req.user = user;
+        // Attach user info to request
+        req.user = decoded;
+        req.token = token;
+        
         next();
     } catch (error) {
-        res.status(401).json({ message: 'Please authenticate' });
+        console.error('Auth middleware error:', error.message);
+        return res.status(401).json({ message: 'Please authenticate', error: error.message });
     }
 };
 
